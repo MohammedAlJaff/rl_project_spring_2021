@@ -17,11 +17,11 @@ class ReplayMemory:
     def __len__(self):
         return len(self.memory)
 
-    def push(self, obs, action, next_obs, reward):
+    def push(self, obs, action, next_obs, reward, terminal):
         if len(self.memory) < self.capacity:
             self.memory.append(None)
 
-        self.memory[self.position] = (obs, action, next_obs, reward)
+        self.memory[self.position] = (obs, action, next_obs, reward, terminal)
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
@@ -84,26 +84,29 @@ def optimize(dqn, target_dqn, memory, optimizer):
     # If we don't have enough transitions stored yet, we don't train.
     if len(memory) < dqn.batch_size:
         return
-    
-    # ? should we run this in a loop with a single vector in each ieration?
 
-    # TODO: Sample a batch from the replay memory and concatenate so that there are
+    # Sample a batch from the replay memory and concatenate so that there are
     #       four tensors in total: observations, actions, next observations and rewards.
     #       Remember to move them to GPU if it is available, e.g., by using Tensor.to(device).
     #       Note that special care is needed for terminal transitions!
-    obs, action, next_obs, reward = memory.sample(dqn.batch_size)
-
+    obs, action, next_obs, reward, term = memory.sample(dqn.batch_size)
+    obs = torch.stack(obs).squeeze()
+    action = torch.stack(action).squeeze()
+    next_obs = torch.stack(next_obs).squeeze()
+    reward = torch.stack(reward).squeeze()
+    term = torch.stack(term).int()
+    
     # Compute the current estimates of the Q-values for each state-action
     #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
     #       corresponding to the chosen actions.
-    # todo: fix this to support vector values currently only working for scalars batch_size = 1
-    q_value_targets = dqn.forward(obs)[:, action]
+    q_value_targets = dqn.forward(obs)
+    q_value_targets = q_value_targets.squeeze()
+    # ! this is extremly dirty code! 
+    q_value_targets = torch.gather(q_value_targets, 1, torch.stack([action, action]).T)[:, 0]
     
     # Compute the Q-value targets. Only do this for non-terminal transitions!
-    if next_obs is not None:
-        q_values = reward + dqn.gamma * (torch.max(target_dqn.forward(next_obs)))
-    else:
-        q_values = reward
+    # ! we also do this for terminal transitions that enable us to run everything in matrix form
+    q_values = reward + dqn.gamma * term * (torch.max(target_dqn.forward(next_obs), dim=1).values)
     
     # Compute loss.
     loss = F.mse_loss(q_values.squeeze(), q_value_targets)

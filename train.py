@@ -61,16 +61,12 @@ if __name__ == '__main__':
                 obs_next, reward, done, info = env.step(action.item())
 
                 # Preprocess incoming observation.
-                if not done:
-                    obs_next = preprocess(obs_next, env=args.env).unsqueeze(0)
-                else:
-                    # ! set next to none to not save unneeded states
-                    # ? Maybe actually preprocess anyways and add to memory, save terminate as variable
-                    obs_next = None
+                # ! always preprocess no matter what.
+                obs_next = preprocess(obs_next, env=args.env).unsqueeze(0)
                 
                 # Add the transition to the replay memory. 
                 # TODO: Remember to convert everything to PyTorch tensors!
-                memory.push(obs, action, obs_next, torch.tensor(reward))
+                memory.push(obs, action, obs_next, torch.tensor(reward), torch.tensor((not done)))
                 obs = obs_next
 
             # Run DQN.optimize() every env_config["train_frequency"] steps.
