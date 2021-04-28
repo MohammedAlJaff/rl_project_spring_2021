@@ -1,2 +1,2 @@
-.DS_Store
-maj/experimental_notebooks
+.vscode/
+__pycache__/
