@@ -42,11 +42,13 @@ class DQN(nn.Module):
         self.gamma = env_config["gamma"]
         self.eps_start = env_config["eps_start"]
         self.eps_end = env_config["eps_end"]
+        self.eps = self.eps_start
         self.anneal_length = env_config["anneal_length"]
+        self.eps_step = (self.eps_start - self.eps_end) / self.anneal_length
         self.n_actions = env_config["n_actions"]
 
         self.fc1 = nn.Linear(4, 256)
-        self.fc2 = nn.Linear(256, self.n_actions) # One output for every action. 
+        self.fc2 = nn.Linear(256, self.n_actions)
 
         self.relu = nn.ReLU()
         self.flatten = nn.Flatten()
@@ -60,30 +62,48 @@ class DQN(nn.Module):
 
     def act(self, observation, exploit=False):
         """Selects an action with an epsilon-greedy exploration strategy."""
-        # TODO: Implement action selection using the Deep Q-network. This function
-        #       takes an observation tensor and should return a tensor of actions.
-        #       For example, if the state dimension is 4 and the batch size is 32,
-        #       the input would be a [32, 4] tensor and the output a [32, 1] tensor.
-        # TODO: Implement epsilon-greedy exploration.
+        # Implement action selection using the Deep Q-network. This function
+        # takes an observation tensor and should return a tensor of actions.
+        # For example, if the state dimension is 4 and the batch size is 32,
+        # the input would be a [32, 4] tensor and the output a [32, 1] tensor.
+        # Implement epsilon-greedy exploration.
+        max_action = torch.argmax(self.forward(observation), dim=1)
+        if not exploit:
+            # possible random action shuffel
+            rand_action = torch.randint_like(max_action, 0, self.n_actions)
+            # create a 1D tensor which is a mask for which actions should be taken randomly
+            rand_mask = (torch.rand(rand_action.size()) <= self.eps).int()
+            # change the epsilon value after every frame is seen
+            self.eps = max(self.eps_end, self.eps - self.eps_step)
+            return (1 - rand_mask) * max_action + rand_mask * rand_action
+        return max_action
 
-        raise NotImplmentedError
 
 def optimize(dqn, target_dqn, memory, optimizer):
     """This function samples a batch from the replay buffer and optimizes the Q-network."""
     # If we don't have enough transitions stored yet, we don't train.
     if len(memory) < dqn.batch_size:
         return
+    
+    # ? should we run this in a loop with a single vector in each ieration?
 
     # TODO: Sample a batch from the replay memory and concatenate so that there are
     #       four tensors in total: observations, actions, next observations and rewards.
     #       Remember to move them to GPU if it is available, e.g., by using Tensor.to(device).
     #       Note that special care is needed for terminal transitions!
+    obs, action, next_obs, reward = memory.sample(dqn.batch_size)
 
-    # TODO: Compute the current estimates of the Q-values for each state-action
+    # Compute the current estimates of the Q-values for each state-action
     #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
     #       corresponding to the chosen actions.
+    # todo: fix this to support vector values currently only working for scalars batch_size = 1
+    q_value_targets = dqn.forward(obs)[:, action]
     
-    # TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
+    # Compute the Q-value targets. Only do this for non-terminal transitions!
+    if next_obs is not None:
+        q_values = reward + dqn.gamma * (torch.max(target_dqn.forward(next_obs)))
+    else:
+        q_values = reward
     
     # Compute loss.
     loss = F.mse_loss(q_values.squeeze(), q_value_targets)

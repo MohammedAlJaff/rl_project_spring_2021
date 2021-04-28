@@ -30,7 +30,9 @@ if __name__ == '__main__':
 
     # Initialize deep Q-networks.
     dqn = DQN(env_config=env_config).to(device)
-    # TODO: Create and initialize target Q-network.
+    # Create target network and set parameters to the same as dqn.
+    target = DQN(env_config=env_config).to(device)
+    target.load_state_dict(dqn.state_dict())
 
     # Create replay memory.
     memory = ReplayMemory(env_config['memory_size'])
@@ -41,28 +43,43 @@ if __name__ == '__main__':
     # Keep track of best evaluation mean return achieved so far.
     best_mean_return = -float("Inf")
 
+    # ? step count outside or inside
+    step = 0
     for episode in range(env_config['n_episodes']):
         done = False
 
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
         
         while not done:
-            # TODO: Get action from DQN.
-            action = None
-
-            # Act in the true environment.
-            obs, reward, done, info = env.step(action)
-
-            # Preprocess incoming observation.
-            if not done:
-                obs = preprocess(obs, env=args.env).unsqueeze(0)
+            step += 1
             
-            # TODO: Add the transition to the replay memory. Remember to convert
-            #       everything to PyTorch tensors!
+            # ! torch no grad should be better here I think!
+            # saves some computing power #optimize
+            with torch.no_grad():
+                action = dqn.act(obs)
+                # Act in the true environment.
+                obs_next, reward, done, info = env.step(action.item())
 
-            # TODO: Run DQN.optimize() every env_config["train_frequency"] steps.
+                # Preprocess incoming observation.
+                if not done:
+                    obs_next = preprocess(obs_next, env=args.env).unsqueeze(0)
+                else:
+                    # ! set next to none to not save unneeded states
+                    # ? Maybe actually preprocess anyways and add to memory, save terminate as variable
+                    obs_next = None
+                
+                # Add the transition to the replay memory. 
+                # TODO: Remember to convert everything to PyTorch tensors!
+                memory.push(obs, action, obs_next, torch.tensor(reward))
+                obs = obs_next
 
-            # TODO: Update the target network every env_config["target_update_frequency"] steps.
+            # Run DQN.optimize() every env_config["train_frequency"] steps.
+            if step % env_config["train_frequency"] == 0:
+                optimize(dqn, target, memory, optimizer)
+
+            # Update the target network every env_config["target_update_frequency"] steps.
+            if step % env_config["target_update_frequency"] == 0:
+                target.load_state_dict(dqn.state_dict())
 
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:
