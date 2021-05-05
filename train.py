@@ -48,11 +48,12 @@ if __name__ == '__main__':
 
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
 
-        # Counters for DQN.optimize and target network updater
-        i_dqn_optimize = 0
-        i_update_target_network = 0
+        # Step counter
+        i_step = 0
 
         while not done:
+            i_step += 1
+
             # TODO: Get action from DQN.
             obs_old = obs
             action = dqn.act(obs_old).item()
@@ -69,27 +70,26 @@ if __name__ == '__main__':
             memory.push(obs_old, torch.tensor(action), obs, torch.tensor(reward))
 
             # TODO: Run DQN.optimize() every env_config["train_frequency"] steps.
-            if i_dqn_optimize % env_config["train_frequency"] == 0:
+            if i_step % env_config["train_frequency"] == 0:
                 optimize(dqn, target_dqn, memory, optimizer)
-            i_dqn_optimize += 1
 
             # TODO: Update the target network every env_config["target_update_frequency"] steps.
-            if i_update_target_network % env_config["target_update_frequency"] == 0:
+            if i_step % env_config["target_update_frequency"] == 0:
                 target_dqn = copy.deepcopy(dqn)
-            i_update_target_network += 1
 
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:
             mean_return = evaluate_policy(dqn, env, env_config, args, n_episodes=args.evaluation_episodes)
             
             print(f'Episode {episode}/{env_config["n_episodes"]}: {mean_return}')
+            print(f'Current eps: {dqn.eps}')
 
             # Save current agent if it has the best performance so far.
             if mean_return >= best_mean_return:
                 best_mean_return = mean_return
 
                 print('Best performance so far! Saving model.')
-                torch.save(dqn, f'models/{args.env}_best.pt')
+                torch.save(dqn, f'models/{args.env}_test.pt')
         
     # Close environment after training is completed.
     env.close()
