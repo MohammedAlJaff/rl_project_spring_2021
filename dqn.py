@@ -83,6 +83,7 @@ class DQN(nn.Module):
             if self.eps > self.eps_end:
                 self.eps -= self.eps_delta
         return actions
+        # ToDo: make this better
 
 
 def optimize(dqn, target_dqn, memory, optimizer):
