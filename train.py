@@ -1,4 +1,5 @@
 import argparse
+import copy
 
 import gym
 import torch
@@ -31,6 +32,7 @@ if __name__ == '__main__':
     # Initialize deep Q-networks.
     dqn = DQN(env_config=env_config).to(device)
     # TODO: Create and initialize target Q-network.
+    target_dqn = copy.deepcopy(dqn)
 
     # Create replay memory.
     memory = ReplayMemory(env_config['memory_size'])
@@ -45,10 +47,15 @@ if __name__ == '__main__':
         done = False
 
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
-        
+
+        # Counters for DQN.optimize and target network updater
+        i_dqn_optimize = 0
+        i_update_target_network = 0
+
         while not done:
             # TODO: Get action from DQN.
-            action = None
+            obs_old = obs
+            action = dqn.act(obs_old).item()
 
             # Act in the true environment.
             obs, reward, done, info = env.step(action)
@@ -59,10 +66,17 @@ if __name__ == '__main__':
             
             # TODO: Add the transition to the replay memory. Remember to convert
             #       everything to PyTorch tensors!
+            memory.push(obs_old, torch.tensor(action), obs, torch.tensor(reward))
 
             # TODO: Run DQN.optimize() every env_config["train_frequency"] steps.
+            if i_dqn_optimize % env_config["train_frequency"] == 0:
+                optimize(dqn, target_dqn, memory, optimizer)
+            i_dqn_optimize += 1
 
             # TODO: Update the target network every env_config["target_update_frequency"] steps.
+            if i_update_target_network % env_config["target_update_frequency"] == 0:
+                target_dqn = copy.deepcopy(dqn)
+            i_update_target_network += 1
 
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:

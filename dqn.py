@@ -1,5 +1,5 @@
 import random
-
+import numpy as np
 import gym
 import torch
 import torch.nn as nn
@@ -43,10 +43,12 @@ class DQN(nn.Module):
         self.eps_start = env_config["eps_start"]
         self.eps_end = env_config["eps_end"]
         self.anneal_length = env_config["anneal_length"]
+        self.eps = self.eps_start
+        self.eps_delta = (self.eps_start - self.eps_end) / self.anneal_length  # ToDo
         self.n_actions = env_config["n_actions"]
 
         self.fc1 = nn.Linear(4, 256)
-        self.fc2 = nn.Linear(256, self.n_actions) # One output for every action. 
+        self.fc2 = nn.Linear(256, self.n_actions)
 
         self.relu = nn.ReLU()
         self.flatten = nn.Flatten()
@@ -65,8 +67,23 @@ class DQN(nn.Module):
         #       For example, if the state dimension is 4 and the batch size is 32,
         #       the input would be a [32, 4] tensor and the output a [32, 1] tensor.
         # TODO: Implement epsilon-greedy exploration.
+        n_observations = observation.shape[0]
+        actions = torch.zeros((n_observations, 1), dtype=torch.int)
+        random_numbers = np.random.uniform(size=n_observations)
+        action_values = self.forward(observation)
+        for i in range(n_observations):
+            if random_numbers[i] <= self.eps and not exploit:
+                # Explore
+                actions[i, 0] = np.random.choice(self.n_actions)
+            else:
+                # Exploit. If several actions are optimal, choose randomly among them
+                best_actions = torch.where(action_values[i] == torch.max(action_values[i]))[0]
+                actions[i, 0] = random.choice(best_actions).item()
+            # Update exploration rate
+            if self.eps > self.eps_end:
+                self.eps -= self.eps_delta
+        return actions
 
-        raise NotImplmentedError
 
 def optimize(dqn, target_dqn, memory, optimizer):
     """This function samples a batch from the replay buffer and optimizes the Q-network."""
@@ -78,12 +95,29 @@ def optimize(dqn, target_dqn, memory, optimizer):
     #       four tensors in total: observations, actions, next observations and rewards.
     #       Remember to move them to GPU if it is available, e.g., by using Tensor.to(device).
     #       Note that special care is needed for terminal transitions!
+    observations, actions, next_observations, rewards = memory.sample(target_dqn.batch_size)
+
+    observations = torch.stack(observations)
+    n_obs, _, n_actions = observations.shape
+    observations = observations.reshape(n_obs, n_actions).to(device)
+
+    actions = torch.stack(actions).reshape(n_obs, 1).to(device)
+
+    next_observations, terminal_indices = handle_terminal_transitions(next_observations, n_actions)
+    next_observations = torch.stack(next_observations).reshape(n_obs, n_actions).to(device)
+
+    rewards = torch.stack(rewards).to(device)
 
     # TODO: Compute the current estimates of the Q-values for each state-action
     #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
     #       corresponding to the chosen actions.
+    q_values = dqn.forward(observations).gather(1, actions)
     
     # TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
+    v = torch.ones(1, n_obs)
+    v[0, terminal_indices] = 0
+    q_value_targets = rewards + target_dqn.gamma * v @ target_dqn.forward(next_observations).max(dim=1).values
+    # ToDo: What to do with non-terminal transitions?
     
     # Compute loss.
     loss = F.mse_loss(q_values.squeeze(), q_value_targets)
@@ -95,3 +129,15 @@ def optimize(dqn, target_dqn, memory, optimizer):
     optimizer.step()
 
     return loss.item()
+
+
+def handle_terminal_transitions(next_obs, n_actions):
+    """
+    Takes the next observations from a memory sample, finds the indices of the terminating states and returns them
+    as a list together with am updated observations sample
+    """
+    terminal_indices = [i for i in range(len(next_obs)) if isinstance(next_obs[i], np.ndarray)]
+    next_observations = list(next_obs)
+    for i in terminal_indices:
+        next_observations[i] = torch.zeros(1, n_actions)
+    return tuple(next_observations), terminal_indices

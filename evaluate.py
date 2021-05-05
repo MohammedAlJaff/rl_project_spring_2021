@@ -24,6 +24,7 @@ ENV_CONFIGS = {
     'CartPole-v0': config.CartPole,
 }
 
+
 def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbose=False):
     """Runs {n_episodes} episodes to evaluate current policy."""
     total_return = 0
@@ -38,20 +39,22 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
             if render:
                 env.render()
 
-            action = dqn.act(obs_stack, exploit=True).item()
+            # ? this might be a bug actually from the skeleton
+            # original line: obs_stack
+            action = dqn.act(obs, exploit=True).item()
 
             obs, reward, done, info = env.step(action)
             obs = preprocess(obs, env=args.env).unsqueeze(0)
 
             episode_return += reward
-        
-        total_return += episode_return
-        
-        if verbose:
-            print(f'Finished episode {i+1} with a total return of {episode_return}')
 
-    
+        total_return += episode_return
+
+        if verbose:
+            print(f'Finished episode {i + 1} with a total return of {episode_return}')
+
     return total_return / n_episodes
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -67,7 +70,8 @@ if __name__ == '__main__':
     dqn = torch.load(args.path, map_location=torch.device('cpu'))
     dqn.eval()
 
-    mean_return = evaluate_policy(dqn, env, env_config, args, args.n_eval_episodes, render=args.render and not args.save_video, verbose=True)
+    mean_return = evaluate_policy(dqn, env, env_config, args, args.n_eval_episodes,
+                                  render=args.render and not args.save_video, verbose=True)
     print(f'The policy got a mean return of {mean_return} over {args.n_eval_episodes} episodes.')
 
     env.close()
