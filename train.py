@@ -43,13 +43,11 @@ if __name__ == '__main__':
     # Keep track of best evaluation mean return achieved so far.
     best_mean_return = -float("Inf")
 
+    i_step = 0  # Step counter
     for episode in range(env_config['n_episodes']):
         done = False
 
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
-
-        # Step counter
-        i_step = 0
 
         while not done:
             i_step += 1
@@ -64,7 +62,7 @@ if __name__ == '__main__':
             # Preprocess incoming observation.
             if not done:
                 obs = preprocess(obs, env=args.env).unsqueeze(0)
-            
+
             # TODO: Add the transition to the replay memory. Remember to convert
             #       everything to PyTorch tensors!
             memory.push(obs_old, torch.tensor(action), obs, torch.tensor(reward))
@@ -80,9 +78,8 @@ if __name__ == '__main__':
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:
             mean_return = evaluate_policy(dqn, env, env_config, args, n_episodes=args.evaluation_episodes)
-            
+
             print(f'Episode {episode}/{env_config["n_episodes"]}: {mean_return}')
-            print(f'Current eps: {dqn.eps}')
 
             # Save current agent if it has the best performance so far.
             if mean_return >= best_mean_return:
@@ -90,6 +87,6 @@ if __name__ == '__main__':
 
                 print('Best performance so far! Saving model.')
                 torch.save(dqn, f'models/{args.env}_test.pt')
-        
+
     # Close environment after training is completed.
     env.close()

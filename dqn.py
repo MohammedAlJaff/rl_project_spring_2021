@@ -83,7 +83,6 @@ class DQN(nn.Module):
             if self.eps > self.eps_end:
                 self.eps -= self.eps_delta
         return actions
-        # ToDo: make this better
 
 
 def optimize(dqn, target_dqn, memory, optimizer):
@@ -113,13 +112,13 @@ def optimize(dqn, target_dqn, memory, optimizer):
     #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
     #       corresponding to the chosen actions.
     q_values = dqn.forward(observations).gather(1, actions)
-    
+
     # TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
     v = torch.ones(1, n_obs)
     v[0, terminal_indices] = 0
-    q_value_targets = rewards + target_dqn.gamma * v @ target_dqn.forward(next_observations).max(dim=1).values
+    q_value_targets = rewards + target_dqn.gamma * v * target_dqn.forward(next_observations).max(dim=1).values
     # ToDo: What to do with non-terminal transitions?
-    
+
     # Compute loss.
     loss = F.mse_loss(q_values.squeeze(), q_value_targets)
 
