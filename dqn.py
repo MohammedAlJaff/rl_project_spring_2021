@@ -23,6 +23,7 @@ class ReplayMemory:
 
         self.memory[self.position] = (obs, action, next_obs, reward)
         self.position = (self.position + 1) % self.capacity
+        # ToDo: include done information
 
     def sample(self, batch_size):
         """
@@ -60,28 +61,14 @@ class DQN(nn.Module):
 
         return x
 
-    def act(self, observation, exploit=False):
+    def act(self, observations, exploit=False):
         """Selects an action with an epsilon-greedy exploration strategy."""
-        # TODO: Implement action selection using the Deep Q-network. This function
-        #       takes an observation tensor and should return a tensor of actions.
-        #       For example, if the state dimension is 4 and the batch size is 32,
-        #       the input would be a [32, 4] tensor and the output a [32, 1] tensor.
-        # TODO: Implement epsilon-greedy exploration.
-        n_observations = observation.shape[0]
-        actions = torch.zeros((n_observations, 1), dtype=torch.int)
-        random_numbers = np.random.uniform(size=n_observations)
-        action_values = self.forward(observation)
-        for i in range(n_observations):
-            if random_numbers[i] <= self.eps and not exploit:
-                # Explore
-                actions[i, 0] = np.random.choice(self.n_actions)
-            else:
-                # Exploit. If several actions are optimal, choose randomly among them
-                best_actions = torch.where(action_values[i] == torch.max(action_values[i]))[0]
-                actions[i, 0] = random.choice(best_actions).item()
-            # Update exploration rate
-            if self.eps > self.eps_end:
-                self.eps -= self.eps_delta
+        n_observations = observations.shape[0]
+        actions = self.forward(observations).argmax(dim=1).int()
+        if not exploit:
+            exploration_vec = torch.bernoulli(self.eps * torch.ones(n_observations)).int()
+            actions += exploration_vec * (np.random.choice(self.n_actions) - actions)
+        self.eps = np.max((self.eps_end, self.eps - self.eps_delta))
         return actions
 
 
@@ -91,10 +78,9 @@ def optimize(dqn, target_dqn, memory, optimizer):
     if len(memory) < dqn.batch_size:
         return
 
-    # TODO: Sample a batch from the replay memory and concatenate so that there are
-    #       four tensors in total: observations, actions, next observations and rewards.
-    #       Remember to move them to GPU if it is available, e.g., by using Tensor.to(device).
-    #       Note that special care is needed for terminal transitions!
+    # TODO: Sample a batch from the replay memory
+    # ToDo: without using handle_terminal_transition but done info
+    # ToDo: use squeeze instead of reshape for observations
     observations, actions, next_observations, rewards = memory.sample(target_dqn.batch_size)
 
     observations = torch.stack(observations)
@@ -108,16 +94,13 @@ def optimize(dqn, target_dqn, memory, optimizer):
 
     rewards = torch.stack(rewards).to(device)
 
-    # TODO: Compute the current estimates of the Q-values for each state-action
-    #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
-    #       corresponding to the chosen actions.
+    # Compute the current estimates of the Q-values for each state-action pair (s,a).
     q_values = dqn.forward(observations).gather(1, actions)
 
-    # TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
+    # Compute the Q-value targets
     v = torch.ones(1, n_obs)
     v[0, terminal_indices] = 0
     q_value_targets = rewards + target_dqn.gamma * v * target_dqn.forward(next_observations).max(dim=1).values
-    # ToDo: What to do with non-terminal transitions?
 
     # Compute loss.
     loss = F.mse_loss(q_values.squeeze(), q_value_targets)
@@ -130,7 +113,7 @@ def optimize(dqn, target_dqn, memory, optimizer):
 
     return loss.item()
 
-
+# ToDo: delete
 def handle_terminal_transitions(next_obs, n_actions):
     """
     Takes the next observations from a memory sample, finds the indices of the terminating states and returns them
