@@ -43,7 +43,7 @@ if __name__ == '__main__':
     # Keep track of best evaluation mean return achieved so far.
     best_mean_return = -float("Inf")
 
-    # ? step count outside or inside
+    # ! step counter has to be outside to work properly
     step = 0
     for episode in range(env_config['n_episodes']):
         done = False
