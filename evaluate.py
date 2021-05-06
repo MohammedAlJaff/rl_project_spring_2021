@@ -38,7 +38,9 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
             if render:
                 env.render()
 
-            action = dqn.act(obs_stack, exploit=True).item()
+            # ? this might be a bug actually from the skeleton
+            # original line: obs_stack
+            action = dqn.act(obs, exploit=True).item()
 
             obs, reward, done, info = env.step(action)
             obs = preprocess(obs, env=args.env).unsqueeze(0)
