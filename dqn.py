@@ -91,22 +91,17 @@ def optimize(dqn, target_dqn, memory, optimizer):
     #       Note that special care is needed for terminal transitions!
     obs, action, next_obs, reward, term = memory.sample(dqn.batch_size)
     obs = torch.stack(obs).squeeze()
-    action = torch.stack(action).squeeze()
+    n_obs = obs.shape[0]
+    action = torch.stack(action).reshape(n_obs, 1)
     next_obs = torch.stack(next_obs).squeeze()
     reward = torch.stack(reward).squeeze()
     term = torch.stack(term).int()
     
     # Compute the current estimates of the Q-values for each state-action
-    #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
-    #       corresponding to the chosen actions.
-    q_value_targets = dqn.forward(obs)
-    q_value_targets = q_value_targets.squeeze()
-    # ! this is extremly dirty code! 
-    q_value_targets = torch.gather(q_value_targets, 1, torch.stack([action, action]).T)[:, 0]
+    q_values = dqn.forward(obs).gather(1, action)
     
-    # Compute the Q-value targets. Only do this for non-terminal transitions!
-    # ! we also do this for terminal transitions that enable us to run everything in matrix form
-    q_values = reward + dqn.gamma * term * (torch.max(target_dqn.forward(next_obs), dim=1).values)
+    # Compute the Q-value targets.
+    q_value_targets = reward + dqn.gamma * term * torch.max(target_dqn.forward(next_obs), dim=1).values
     
     # Compute loss.
     loss = F.mse_loss(q_values.squeeze(), q_value_targets)
