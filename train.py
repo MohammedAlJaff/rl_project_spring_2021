@@ -9,7 +9,7 @@ from utils import preprocess
 from evaluate import evaluate_policy
 from dqn import DQN, ReplayMemory, optimize
 
-# todo: use wandb again
+import wandb
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -29,6 +29,14 @@ if __name__ == '__main__':
     # Initialize environment and config.
     env = gym.make(args.env)
     env_config = ENV_CONFIGS[args.env]
+    
+    # set up weights and biases
+    # 1. Start a new run
+    wandb.init(project='reinforcement-learning')
+    # 2. Save model inputs and hyperparameters
+    config = wandb.config
+    # save parameters in the model here!
+    config.update(env_config)
 
     # Initialize deep Q-networks.
     dqn = DQN(env_config=env_config).to(device)
@@ -86,6 +94,7 @@ if __name__ == '__main__':
         if episode % args.evaluate_freq == 0:
             mean_return = evaluate_policy(dqn, env, env_config, args, n_episodes=args.evaluation_episodes)
             
+            wandb.log({"mean return": mean_return, "episode": episode})
             print(f'Episode {episode}/{env_config["n_episodes"]}: {mean_return}')
 
             # Save current agent if it has the best performance so far.
