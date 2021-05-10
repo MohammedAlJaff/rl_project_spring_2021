@@ -22,6 +22,7 @@ parser.set_defaults(save_video=False)
 # Hyperparameter configurations for different environments. See config.py.
 ENV_CONFIGS = {
     'CartPole-v0': config.CartPole,
+    'Pong-v0': config.Pong,
 }
 
 def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbose=False):
@@ -29,8 +30,9 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
     total_return = 0
 
     for i in range(n_episodes):
-        # todo: use obs stack here instead
-        obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
+        obs = torch.tensor(env.reset()).float()
+        
+        obs_stack = torch.stack(env_config['observation_stack_size'] * [obs]).unsqueeze(0).to(device)
 
         done = False
         episode_return = 0
@@ -38,13 +40,13 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
         while not done:
             if render:
                 env.render()
+            
+            action = dqn.map_action(dqn.act(obs_stack, exploit=True))
 
-            # ? this might be a bug actually from the skeleton
-            # original line: obs_stack
-            action = dqn.act(obs, exploit=True).item()
-
-            obs, reward, done, info = env.step(action)
-            obs = preprocess(obs, env=args.env).unsqueeze(0)
+            next_obs, reward, done, info = env.step(action)
+            next_obs = torch.tensor(next_obs).float().unsqueeze(0)
+            
+            obs_stack = torch.cat((obs_stack[:, 1:, ...], next_obs.unsqueeze(1)), dim=1).to(device)
 
             episode_return += reward
         
@@ -61,6 +63,8 @@ if __name__ == '__main__':
 
     # Initialize environment and config
     env = gym.make(args.env)
+    env = gym.wrappers.AtariPreprocessing(env, screen_size=84, grayscale_obs=True, frame_skip=1, noop_max=30, scale_obs=True)
+    
     env_config = ENV_CONFIGS[args.env]
 
     if args.save_video:
