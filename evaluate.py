@@ -24,12 +24,15 @@ ENV_CONFIGS = {
     'CartPole-v0': config.CartPole,
 }
 
+
 def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbose=False):
     """Runs {n_episodes} episodes to evaluate current policy."""
     total_return = 0
+    obs_stack_size = env_config['observation_stack_size']
 
     for i in range(n_episodes):
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
+        obs_stack = torch.cat(obs_stack_size * [obs]).unsqueeze(0).to(device)
 
         done = False
         episode_return = 0
@@ -40,10 +43,11 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
 
             # ? this might be a bug actually from the skeleton
             # original line: obs_stack
-            action = dqn.act(obs, exploit=True).item()
+            action = dqn.act(obs_stack, exploit=True).item()
 
             obs, reward, done, info = env.step(action)
             obs = preprocess(obs, env=args.env).unsqueeze(0)
+            obs_stack = torch.cat((obs_stack[:, 1:, ...], obs.unsqueeze(1)), dim=1).to(device)
 
             episode_return += reward
         
@@ -51,9 +55,9 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
         
         if verbose:
             print(f'Finished episode {i+1} with a total return of {episode_return}')
-
     
     return total_return / n_episodes
+
 
 if __name__ == '__main__':
     args = parser.parse_args()

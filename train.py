@@ -3,6 +3,7 @@ import argparse
 import gym
 import torch
 import torch.nn as nn
+from gym.wrappers import AtariPreprocessing
 
 import config
 from utils import preprocess
@@ -12,13 +13,14 @@ from dqn import DQN, ReplayMemory, optimize
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env', choices=['CartPole-v0'])
+parser.add_argument('--env', choices=['CartPole-v0', 'Pong-v0'])
 parser.add_argument('--evaluate_freq', type=int, default=25, help='How often to run evaluation.', nargs='?')
 parser.add_argument('--evaluation_episodes', type=int, default=5, help='Number of evaluation episodes.', nargs='?')
 
 # Hyperparameter configurations for different environments. See config.py.
 ENV_CONFIGS = {
-    'CartPole-v0': config.CartPole
+    'CartPole-v0': config.CartPole,
+    'Pong-v0': config.Pong
 }
 
 if __name__ == '__main__':
@@ -26,6 +28,7 @@ if __name__ == '__main__':
 
     # Initialize environment and config.
     env = gym.make(args.env)
+    env = AtariPreprocessing(env, screen_size=84, grayscale_obs=True, frame_skip=1, noop_max=30)
     env_config = ENV_CONFIGS[args.env]
 
     # Initialize deep Q-networks.
@@ -43,12 +46,17 @@ if __name__ == '__main__':
     # Keep track of best evaluation mean return achieved so far.
     best_mean_return = -float("Inf")
 
+    obs_stack_size = env_config['observation_stack_size']
+
     # ! step counter has to be outside to work properly
     step = 0
     for episode in range(env_config['n_episodes']):
         done = False
 
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
+        obs_stack = torch.cat(obs_stack_size * [obs]).unsqueeze(0).to(device)
+        # print(f"obs: {obs.shape}")
+        # print(f"obs_stack: {obs_stack.shape}")
         
         while not done:
             step += 1
@@ -56,18 +64,21 @@ if __name__ == '__main__':
             # ! torch no grad should be better here I think!
             # saves some computing power #optimize
             with torch.no_grad():
-                action = dqn.act(obs)
+                action = dqn.act(obs_stack)
                 # Act in the true environment.
                 obs_next, reward, done, info = env.step(action.item())
 
                 # Preprocess incoming observation.
                 # ! always preprocess no matter what.
                 obs_next = preprocess(obs_next, env=args.env).unsqueeze(0)
+                obs_next_stack = torch.cat((obs_stack[:, 1:, ...], obs_next.unsqueeze(1)), dim=1).to(device)
+                # print(f"obs_next: {obs_next.shape}")
+                # print(f"obs_next_stack: {obs_next_stack.shape}")
                 
                 # Add the transition to the replay memory. 
                 # TODO: Remember to convert everything to PyTorch tensors!
-                memory.push(obs, action, obs_next, torch.tensor(reward), torch.tensor((not done)))
-                obs = obs_next
+                memory.push(obs_stack, action, obs_next_stack, torch.tensor(reward), torch.tensor((not done)))
+                obs_stack = obs_next_stack
 
             # Run DQN.optimize() every env_config["train_frequency"] steps.
             if step % env_config["train_frequency"] == 0:
@@ -80,7 +91,7 @@ if __name__ == '__main__':
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:
             mean_return = evaluate_policy(dqn, env, env_config, args, n_episodes=args.evaluation_episodes)
-            
+
             print(f'Episode {episode}/{env_config["n_episodes"]}: {mean_return}')
 
             # Save current agent if it has the best performance so far.

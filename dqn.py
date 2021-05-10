@@ -47,14 +47,22 @@ class DQN(nn.Module):
         self.eps_step = (self.eps_start - self.eps_end) / self.anneal_length
         self.n_actions = env_config["n_actions"]
 
-        self.fc1 = nn.Linear(4, 256)
-        self.fc2 = nn.Linear(256, self.n_actions)
-
+        # self.fc1 = nn.Linear(4, 256)
+        # self.fc2 = nn.Linear(256, self.n_actions)
+        self.conv1 = nn.Conv2d(4, 32, kernel_size=(8, 8), stride=(4, ), padding=(0, 0))
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2), padding=(0, 0))
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0))
+        self.fc1 = nn.Linear(3136, 512)
+        self.fc2 = nn.Linear(512, self.n_actions)
         self.relu = nn.ReLU()
         self.flatten = nn.Flatten()
 
     def forward(self, x):
         """Runs the forward pass of the NN depending on architecture."""
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
+        x = self.relu(self.conv3(x))
+        x = self.flatten(x)
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
 
