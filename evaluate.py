@@ -29,6 +29,7 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
     total_return = 0
 
     for i in range(n_episodes):
+        # todo: use obs stack here instead
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
 
         done = False

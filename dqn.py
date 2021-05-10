@@ -47,6 +47,7 @@ class DQN(nn.Module):
         self.eps_step = (self.eps_start - self.eps_end) / self.anneal_length
         self.n_actions = env_config["n_actions"]
 
+        # TODO: adjust the network architecture!
         self.fc1 = nn.Linear(4, 256)
         self.fc2 = nn.Linear(256, self.n_actions)
 

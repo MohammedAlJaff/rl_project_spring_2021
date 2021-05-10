@@ -9,6 +9,8 @@ from utils import preprocess
 from evaluate import evaluate_policy
 from dqn import DQN, ReplayMemory, optimize
 
+# todo: use wandb again
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
@@ -48,6 +50,7 @@ if __name__ == '__main__':
     for episode in range(env_config['n_episodes']):
         done = False
 
+        # todo: adjust preprocessing
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
         
         while not done:
@@ -58,14 +61,16 @@ if __name__ == '__main__':
             with torch.no_grad():
                 action = dqn.act(obs)
                 # Act in the true environment.
+                # todo: (optional) always take 4 steps of the same action (might speed up training)
                 obs_next, reward, done, info = env.step(action.item())
 
                 # Preprocess incoming observation.
+                # todo: adjust to take stack of 4 images
                 # ! always preprocess no matter what.
                 obs_next = preprocess(obs_next, env=args.env).unsqueeze(0)
                 
                 # Add the transition to the replay memory. 
-                # TODO: Remember to convert everything to PyTorch tensors!
+                # ! Remember to convert everything to PyTorch tensors!
                 memory.push(obs, action, obs_next, torch.tensor(reward), torch.tensor((not done)))
                 obs = obs_next
 
