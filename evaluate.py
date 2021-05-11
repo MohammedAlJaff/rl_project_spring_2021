@@ -11,8 +11,8 @@ from utils import preprocess
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env', choices=['CartPole-v0'])
-parser.add_argument('--path', type=str, help='Path to stored DQN model.')
+parser.add_argument('--env', choices=['CartPole-v0', 'Pong-v0'], required=True)
+parser.add_argument('--path', type=str, help='Path to stored DQN model.', required=True)
 parser.add_argument('--n_eval_episodes', type=int, default=1, help='Number of evaluation episodes.', nargs='?')
 parser.add_argument('--render', dest='render', action='store_true', help='Render the environment.')
 parser.add_argument('--save_video', dest='save_video', action='store_true', help='Save the episodes as video.')
@@ -70,11 +70,12 @@ if __name__ == '__main__':
     if args.save_video:
         env = gym.wrappers.Monitor(env, './video/', video_callable=lambda episode_id: True, force=True)
 
-    # Load model from provided path.
-    dqn = torch.load(args.path, map_location=torch.device('cpu'))
-    dqn.eval()
-
-    mean_return = evaluate_policy(dqn, env, env_config, args, args.n_eval_episodes, render=args.render and not args.save_video, verbose=True)
+    with torch.no_grad():
+        # Load model from provided path.
+        dqn = torch.load(args.path, map_location=torch.device('cpu'))
+        dqn.eval()
+        # compute mean return
+        mean_return = evaluate_policy(dqn, env, env_config, args, args.n_eval_episodes, render=args.render and not args.save_video, verbose=True)
+    
     print(f'The policy got a mean return of {mean_return} over {args.n_eval_episodes} episodes.')
-
     env.close()
