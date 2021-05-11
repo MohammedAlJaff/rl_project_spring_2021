@@ -44,7 +44,7 @@ CartPole = {
 # majnotes - Hyperparameters for Pong. 
 Pong = {
     'memory_size': 10000,
-    'n_episodes': 1000,  # ToDo: probably more episodes necessary
+    'n_episodes': 2000,
     'batch_size': 32,
     'target_update_frequency': 1000,
     'train_frequency': 4,

@@ -14,6 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--env', choices=['CartPole-v0', 'Pong-v0'])
+parser.add_argument('--path_prefix', type=str, help='Path prefix to store DQN model.', default='')
 parser.add_argument('--evaluate_freq', type=int, default=25, help='How often to run evaluation.', nargs='?')
 parser.add_argument('--evaluation_episodes', type=int, default=5, help='Number of evaluation episodes.', nargs='?')
 
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     best_mean_return = -float("Inf")
 
     obs_stack_size = env_config['observation_stack_size']
+
 
     # ! step counter has to be outside to work properly
     step = 0
@@ -99,7 +101,7 @@ if __name__ == '__main__':
                 best_mean_return = mean_return
 
                 print('Best performance so far! Saving model.')
-                torch.save(dqn, f'models/{args.env}_best.pt')
+                torch.save(dqn, f'{args.path_prefix}models/{args.env}_best.pt')
         
     # Close environment after training is completed.
     env.close()
