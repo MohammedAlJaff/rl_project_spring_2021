@@ -4,6 +4,7 @@ import random
 import gym
 import torch
 import torch.nn as nn
+from gym.wrappers import AtariPreprocessing
 
 import config
 from utils import preprocess
@@ -11,7 +12,7 @@ from utils import preprocess
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env', choices=['CartPole-v0'])
+parser.add_argument('--env', choices=['CartPole-v0', 'Pong-v0'])
 parser.add_argument('--path', type=str, help='Path to stored DQN model.')
 parser.add_argument('--n_eval_episodes', type=int, default=1, help='Number of evaluation episodes.', nargs='?')
 parser.add_argument('--render', dest='render', action='store_true', help='Render the environment.')
@@ -22,6 +23,7 @@ parser.set_defaults(save_video=False)
 # Hyperparameter configurations for different environments. See config.py.
 ENV_CONFIGS = {
     'CartPole-v0': config.CartPole,
+    'Pong-v0': config.Pong
 }
 
 
@@ -43,7 +45,7 @@ def evaluate_policy(dqn, env, env_config, args, n_episodes, render=False, verbos
 
             # ? this might be a bug actually from the skeleton
             # original line: obs_stack
-            action = dqn.act(obs_stack, exploit=True).item()
+            action = dqn.map_action(dqn.act(obs_stack, exploit=True))
 
             obs, reward, done, info = env.step(action)
             obs = preprocess(obs, env=args.env).unsqueeze(0)
@@ -64,6 +66,7 @@ if __name__ == '__main__':
 
     # Initialize environment and config
     env = gym.make(args.env)
+    env = AtariPreprocessing(env, screen_size=84, grayscale_obs=True, frame_skip=1, noop_max=30, scale_obs=True)
     env_config = ENV_CONFIGS[args.env]
 
     if args.save_video:

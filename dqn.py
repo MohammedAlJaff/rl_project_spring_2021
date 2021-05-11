@@ -62,11 +62,20 @@ class DQN(nn.Module):
         x = self.relu(self.conv1(x))
         x = self.relu(self.conv2(x))
         x = self.relu(self.conv3(x))
-        x = self.flatten(x)
+        x = self.flatten(x)  # ToDo: ?
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
 
         return x
+
+    def map_action(self, x):
+        a = x.item()
+        if a == 0:
+            return 2
+        elif a == 1:
+            return 3
+        else:
+            return -1
 
     def act(self, observation, exploit=False):
         """Selects an action with an epsilon-greedy exploration strategy."""
@@ -78,13 +87,11 @@ class DQN(nn.Module):
         max_action = torch.argmax(self.forward(observation), dim=1)
         if not exploit:
             # possible random action shuffel
-            rand_action = torch.randint_like(max_action, 0, self.n_actions)
+            rand_action = torch.randint_like(max_action, 0, self.n_actions).to(device)
             # create a 1D tensor which is a mask for which actions should be taken randomly
             rand_mask = (torch.rand(rand_action.size()) <= self.eps).int().to(device)
             # change the epsilon value after every frame is seen
             self.eps = max(self.eps_end, self.eps - self.eps_step)
-            print(rand_mask.device)
-            print(max_action.device)
             return (1 - rand_mask) * max_action + rand_mask * rand_action
         return max_action
 

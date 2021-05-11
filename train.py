@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     # Initialize environment and config.
     env = gym.make(args.env)
-    env = AtariPreprocessing(env, screen_size=84, grayscale_obs=True, frame_skip=1, noop_max=30)
+    env = AtariPreprocessing(env, screen_size=84, grayscale_obs=True, frame_skip=1, noop_max=30, scale_obs=True)
     env_config = ENV_CONFIGS[args.env]
 
     # Initialize deep Q-networks.
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             with torch.no_grad():
                 action = dqn.act(obs_stack)
                 # Act in the true environment.
-                obs_next, reward, done, info = env.step(action.item())
+                obs_next, reward, done, info = env.step(dqn.map_action(action))
 
                 # Preprocess incoming observation.
                 # ! always preprocess no matter what.
