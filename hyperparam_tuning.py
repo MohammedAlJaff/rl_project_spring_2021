@@ -13,30 +13,44 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = 'cpu' #m
+
+
+
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env', choices=['CartPole-v0'])
+parser.add_argument('--env', choices=['CartPole-v0'], default='CartPole-v0')
 parser.add_argument('--evaluate_freq', type=int, default=50, help='How often to run evaluation.', nargs='?')
 parser.add_argument('--evaluation_episodes', type=int, default=5, help='Number of evaluation episodes.', nargs='?')
 
-# Hyperparameter configurations for different environments. See config.py.
-ENV_CONFIGS = {
-    'CartPole-v0': config.CartPole
-}
-
-if __name__ == '__main__':
+def train_agent(eps_start, eps_end, anneal_length):
+    
+    CartPoleConfigs = {
+    'memory_size': 50000,
+    'n_episodes': 1000,
+    'batch_size': 32,
+    'target_update_frequency': 100,
+    'train_frequency': 1,
+    'gamma': 0.95,
+    'lr': 1e-4,
+    'n_actions': 2,
+    }
+    
+    CartPoleConfigs['eps_start'] = eps_start
+    CartPoleConfigs['eps_end'] = eps_end
+    CartPoleConfigs['anneal_length'] = anneal_length
+    
     
     print(f"device: {device}")
     args = parser.parse_args()
 
     # Initialize environment and config.
-    env = gym.make(args.env)
-    env_config = ENV_CONFIGS[args.env]
-    print('----')
+    env = gym.make('CartPole-v0')
+    env_config = CartPoleConfigs
+    
     print(env_config)
-    print('----')
 
+    print('----')
+    print('constructing DQN')
     # Initialize deep Q-networks.
     dqn = DQN(env_config=env_config).to(device)
     # Create target network and set parameters to the same as dqn.
@@ -57,7 +71,7 @@ if __name__ == '__main__':
     
     # ! step counter has to be outside to work properly
     step = 0
-    for episode in range(200):#env_config['n_episodes']):
+    for episode in range(201):#env_config['n_episodes']):
         done = False
 
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
@@ -108,8 +122,25 @@ if __name__ == '__main__':
     # Close environment after training is completed.
     env.close()
     
+    return np.array(training_phase_values)
     
-    training_phase_values = np.array(training_phase_values)
-    print(training_phase_values)
-    plt.plot(training_phase_values[:,0], training_phase_values[:,1])
-    plt.savefig('blaaa.png')
+    
+    
+if __name__ == "__main__":
+    
+    # Annealing_length tuning
+    # We fix eps_start=0.9 & eps_end=0.1
+    
+    for annealing_exp_i in [1000,500,250,100,1]:
+        print("#######################################################")
+        print(f'Annealing_Experiment: anneal_length={annealing_exp_i}')
+        print("#######################################################")
+        for replicate_j in range(3):
+            print(f'\treplicate : {replicate_j}') 
+            x = train_agent(eps_start=1, eps_end=0.05, anneal_length=annealing_exp_i)
+            print(x)
+        print('')
+    
+    plt.show()
+    
+    

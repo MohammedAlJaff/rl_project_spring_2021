@@ -6,6 +6,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print('dqn.py sees devices: ', device) #m
+#device = 'cpu' #
+
 
 
 class ReplayMemory:
@@ -68,14 +71,23 @@ class DQN(nn.Module):
         # the input would be a [32, 4] tensor and the output a [32, 1] tensor.
         # Implement epsilon-greedy exploration.
         max_action = torch.argmax(self.forward(observation), dim=1)
+        #print('where is max_action?: ', max_action.device)
         if not exploit:
             # possible random action shuffel
-            rand_action = torch.randint_like(max_action, 0, self.n_actions)
+            #old: rand_action = torch.randint_like(max_action, 0, self.n_actions)
+            rand_action = torch.randint_like(max_action, 0, self.n_actions).to(device) 
+            #print('where is rand_actions?: ', rand_action.device)
+        
             # create a 1D tensor which is a mask for which actions should be taken randomly
-            rand_mask = (torch.rand(rand_action.size()) <= self.eps).int()
+            #old: rand_mask = (torch.rand(rand_action.size()) <= self.eps).int()
+            rand_mask = (torch.rand(rand_action.size()) <= self.eps).int().to(device)
+            #print('where is rand_mask?: ', rand_mask.device)
+            
             # change the epsilon value after every frame is seen
             self.eps = max(self.eps_end, self.eps - self.eps_step)
-            return (1 - rand_mask) * max_action + rand_mask * rand_action
+            dummy_z = (1 - rand_mask) * max_action + rand_mask * rand_action
+            #print('dummy z where?: ', dummy_z.device)
+            return dummy_z
         return max_action
 
 
@@ -92,10 +104,11 @@ def optimize(dqn, target_dqn, memory, optimizer):
     obs, action, next_obs, reward, term = memory.sample(dqn.batch_size)
     obs = torch.stack(obs).squeeze()
     n_obs = obs.shape[0]
-    action = torch.stack(action).reshape(n_obs, 1)
-    next_obs = torch.stack(next_obs).squeeze()
-    reward = torch.stack(reward).squeeze()
-    term = torch.stack(term).int()
+    
+    action = torch.stack(action).reshape(n_obs, 1).to(device)
+    next_obs = torch.stack(next_obs).squeeze().to(device)
+    reward = torch.stack(reward).squeeze().to(device)
+    term = torch.stack(term).int().to(device)
     
     # Compute the current estimates of the Q-values for each state-action
     q_values = dqn.forward(obs).gather(1, action)
