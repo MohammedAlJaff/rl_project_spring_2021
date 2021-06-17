@@ -4,7 +4,7 @@ import gym
 import torch
 import torch.nn as nn
 from gym.wrappers import AtariPreprocessing
-
+import matplotlib.pyplot as plt
 import config
 from utils import preprocess
 from evaluate import evaluate_policy
@@ -17,6 +17,9 @@ parser.add_argument('--env', choices=['CartPole-v0', 'Pong-v0'])
 parser.add_argument('--path_prefix', type=str, help='Path prefix to store DQN model.', default='')
 parser.add_argument('--evaluate_freq', type=int, default=25, help='How often to run evaluation.', nargs='?')
 parser.add_argument('--evaluation_episodes', type=int, default=5, help='Number of evaluation episodes.', nargs='?')
+parser.add_argument('--plot_episode_returns', dest='plot_episode_returns', action='store_true',
+                    help='Save a plot with episode returns during course of training', default=True)
+parser.set_defaults(plot_episode_returns=True)
 
 # Hyperparameter configurations for different environments. See config.py.
 ENV_CONFIGS = {
@@ -49,6 +52,9 @@ if __name__ == '__main__':
 
     obs_stack_size = env_config['observation_stack_size']
 
+    if args.plot_episode_returns:
+        episodes = []
+        episode_returns = []
 
     # ! step counter has to be outside to work properly
     step = 0
@@ -96,12 +102,22 @@ if __name__ == '__main__':
 
             print(f'Episode {episode}/{env_config["n_episodes"]}: {mean_return}')
 
+            if args.plot_episode_returns:
+                episodes.append(episode)
+                episode_returns.append(mean_return)
+                plt.plot(episodes, episode_returns)
+                plt.xlabel('episodes')
+                plt.ylabel('mean return')
+                plt.title('Training progress')
+                plt.savefig(f'{args.path_prefix}plots/training_progress.png', dpi=1000)
+
             # Save current agent if it has the best performance so far.
             if mean_return >= best_mean_return:
                 best_mean_return = mean_return
 
                 print('Best performance so far! Saving model.')
                 torch.save(dqn, f'{args.path_prefix}models/{args.env}_best.pt')
-        
+
+
     # Close environment after training is completed.
     env.close()
